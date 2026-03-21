@@ -1,0 +1,209 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* GTUS Dark Tech Palette — OKLCH raw L C H values */
+    --background: 0.09 0.018 255;
+    --foreground: 0.94 0.01 230;
+    --card: 0.12 0.022 255;
+    --card-foreground: 0.94 0.01 230;
+    --popover: 0.14 0.025 255;
+    --popover-foreground: 0.94 0.01 230;
+
+    /* Cyan accent as primary */
+    --primary: 0.84 0.18 200;
+    --primary-foreground: 0.09 0.018 255;
+
+    --secondary: 0.16 0.03 255;
+    --secondary-foreground: 0.82 0.01 230;
+
+    --muted: 0.15 0.025 255;
+    --muted-foreground: 0.55 0.03 230;
+
+    --accent: 0.84 0.18 200;
+    --accent-foreground: 0.09 0.018 255;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.985 0 0;
+
+    --border: 0.22 0.035 255;
+    --input: 0.18 0.03 255;
+    --ring: 0.84 0.18 200;
+
+    --chart-1: 0.84 0.18 200;
+    --chart-2: 0.6 0.18 240;
+    --chart-3: 0.7 0.2 195;
+    --chart-4: 0.65 0.15 255;
+    --chart-5: 0.75 0.22 210;
+
+    --sidebar: 0.11 0.02 255;
+    --sidebar-foreground: 0.94 0.01 230;
+    --sidebar-primary: 0.84 0.18 200;
+    --sidebar-primary-foreground: 0.09 0.018 255;
+    --sidebar-accent: 0.16 0.03 255;
+    --sidebar-accent-foreground: 0.82 0.01 230;
+    --sidebar-border: 0.22 0.035 255;
+    --sidebar-ring: 0.84 0.18 200;
+
+    /* Custom tokens */
+    --cyan: 0.84 0.18 200;
+    --cyan-glow: 0.84 0.22 200;
+    --navy: 0.09 0.018 255;
+    --navy-mid: 0.13 0.025 255;
+    --navy-light: 0.18 0.035 255;
+    --electric-blue: 0.55 0.22 250;
+  }
+
+  * {
+    @apply border-border;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Space Grotesk", sans-serif;
+    background-color: oklch(0.09 0.018 255);
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  /* Shimmer animation for headline */
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(32px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 20px oklch(0.84 0.22 200 / 0.3), 0 0 40px oklch(0.84 0.22 200 / 0.1);
+    }
+    50% {
+      box-shadow: 0 0 30px oklch(0.84 0.22 200 / 0.5), 0 0 60px oklch(0.84 0.22 200 / 0.25);
+    }
+  }
+
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      oklch(0.84 0.18 200) 0%,
+      oklch(0.97 0.05 195) 25%,
+      oklch(0.84 0.18 200) 50%,
+      oklch(0.55 0.22 250) 75%,
+      oklch(0.84 0.18 200) 100%
+    );
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s linear infinite;
+  }
+
+  .animate-fadeInUp {
+    animation: fadeInUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-fadeInLeft {
+    animation: fadeInLeft 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+
+  .card-glow {
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+  }
+
+  .card-glow:hover {
+    box-shadow: 0 0 25px oklch(0.84 0.22 200 / 0.35), 0 0 50px oklch(0.84 0.22 200 / 0.15);
+    border-color: oklch(0.84 0.18 200);
+    transform: translateY(-4px);
+  }
+
+  .btn-pulse:hover {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  .mesh-bg {
+    background-image:
+      radial-gradient(ellipse at 20% 50%, oklch(0.55 0.22 250 / 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, oklch(0.84 0.18 200 / 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 80%, oklch(0.45 0.18 260 / 0.07) 0%, transparent 50%);
+  }
+
+  .grid-pattern {
+    background-image:
+      linear-gradient(oklch(0.84 0.18 200 / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.84 0.18 200 / 0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .section-divider {
+    background: linear-gradient(90deg, transparent, oklch(0.84 0.18 200 / 0.4), transparent);
+    height: 1px;
+  }
+
+  .input-cyber {
+    background: oklch(0.13 0.025 255) !important;
+    border-color: oklch(0.25 0.04 255) !important;
+    color: oklch(0.94 0.01 230) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .input-cyber:focus {
+    border-color: oklch(0.84 0.18 200) !important;
+    box-shadow: 0 0 0 2px oklch(0.84 0.18 200 / 0.2) !important;
+    outline: none !important;
+  }
+
+  .input-cyber::placeholder {
+    color: oklch(0.45 0.02 230) !important;
+  }
+}
