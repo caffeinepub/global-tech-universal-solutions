@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { useInternetIdentity } from "@/hooks/useInternetIdentity";
+import { Loader2, Menu, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const navLinks = [
@@ -10,9 +11,15 @@ const navLinks = [
   { label: "Contact", href: "#contact" },
 ];
 
-export default function Navbar() {
+interface NavbarProps {
+  onAdminClick: () => void;
+}
+
+export default function Navbar({ onAdminClick }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { identity, login, isLoggingIn, isInitializing } =
+    useInternetIdentity();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 40);
@@ -25,6 +32,14 @@ export default function Navbar() {
     const id = href.replace("#", "");
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleAdminClick = () => {
+    if (!identity) {
+      login();
+    } else {
+      onAdminClick();
+    }
   };
 
   return (
@@ -86,8 +101,27 @@ export default function Navbar() {
           ))}
         </ul>
 
-        {/* Desktop CTA */}
-        <div className="hidden md:flex items-center">
+        {/* Desktop CTAs */}
+        <div className="hidden md:flex items-center gap-2">
+          <Button
+            onClick={handleAdminClick}
+            disabled={isLoggingIn || isInitializing}
+            variant="ghost"
+            size="sm"
+            className="text-sm font-medium gap-1.5"
+            style={{
+              color: "oklch(0.72 0.03 230)",
+              borderColor: "oklch(0.22 0.035 255)",
+            }}
+            data-ocid="admin.button"
+          >
+            {isLoggingIn ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <ShieldCheck size={15} />
+            )}
+            {identity ? "Dashboard" : "Admin"}
+          </Button>
           <Button
             onClick={() => handleNav("#apply")}
             className="text-sm font-semibold px-5 py-2 rounded-md btn-pulse"
@@ -138,6 +172,26 @@ export default function Navbar() {
                 </a>
               </li>
             ))}
+            <li>
+              <Button
+                onClick={() => {
+                  setMobileOpen(false);
+                  handleAdminClick();
+                }}
+                disabled={isLoggingIn || isInitializing}
+                variant="ghost"
+                className="w-full text-sm font-medium justify-start gap-2"
+                style={{ color: "oklch(0.72 0.03 230)" }}
+                data-ocid="admin.button"
+              >
+                {isLoggingIn ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <ShieldCheck size={15} />
+                )}
+                {identity ? "Admin Dashboard" : "Admin Login"}
+              </Button>
+            </li>
             <li className="pt-2">
               <Button
                 onClick={() => handleNav("#apply")}

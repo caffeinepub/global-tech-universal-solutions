@@ -8,6 +8,11 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const UserRole = IDL.Variant({
+  'admin' : IDL.Null,
+  'user' : IDL.Null,
+  'guest' : IDL.Null,
+});
 export const ApplicationStatus = IDL.Variant({
   'pending' : IDL.Null,
   'interview' : IDL.Null,
@@ -24,6 +29,10 @@ export const JobRole = IDL.Variant({
   'dataScientist' : IDL.Null,
 });
 export const Time = IDL.Int;
+export const GpsCoordinates = IDL.Record({
+  'latitude' : IDL.Float64,
+  'longitude' : IDL.Float64,
+});
 export const JobApplication = IDL.Record({
   'id' : IDL.Nat,
   'status' : ApplicationStatus,
@@ -31,26 +40,68 @@ export const JobApplication = IDL.Record({
   'fullName' : IDL.Text,
   'email' : IDL.Text,
   'timestamp' : Time,
+  'locationLabel' : IDL.Opt(IDL.Text),
   'coverNote' : IDL.Text,
+  'location' : IDL.Opt(GpsCoordinates),
   'resumeUrl' : IDL.Text,
+});
+export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const VisitorLog = IDL.Record({
+  'id' : IDL.Nat,
+  'latitude' : IDL.Float64,
+  'longitude' : IDL.Float64,
+  'timestamp' : Time,
+  'userAgent' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
+  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'blockEmail' : IDL.Func([IDL.Text], [], []),
   'getAllApplications' : IDL.Func([], [IDL.Vec(JobApplication)], ['query']),
+  'getBlockedEmails' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
+  'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getTotalApplications' : IDL.Func([], [IDL.Nat], ['query']),
+  'getUserProfile' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(UserProfile)],
+      ['query'],
+    ),
+  'getVisitorLogs' : IDL.Func([], [IDL.Vec(VisitorLog)], ['query']),
   'isAcceptingApplications' : IDL.Func([], [IDL.Bool], ['query']),
+  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'isEmailBlocked' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'logVisitorLocation' : IDL.Func([IDL.Float64, IDL.Float64, IDL.Text], [], []),
+  'resetAdminClaim' : IDL.Func([], [], []),
+  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setAcceptingApplications' : IDL.Func([IDL.Bool], [], []),
   'submitApplication' : IDL.Func(
-      [IDL.Text, IDL.Text, JobRole, IDL.Text, IDL.Text],
+      [
+        IDL.Text,
+        IDL.Text,
+        JobRole,
+        IDL.Text,
+        IDL.Text,
+        IDL.Opt(IDL.Float64),
+        IDL.Opt(IDL.Float64),
+        IDL.Opt(IDL.Text),
+      ],
       [IDL.Nat],
       [],
     ),
+  'unblockEmail' : IDL.Func([IDL.Text], [], []),
   'updateApplicationStatus' : IDL.Func([IDL.Nat, ApplicationStatus], [], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const UserRole = IDL.Variant({
+    'admin' : IDL.Null,
+    'user' : IDL.Null,
+    'guest' : IDL.Null,
+  });
   const ApplicationStatus = IDL.Variant({
     'pending' : IDL.Null,
     'interview' : IDL.Null,
@@ -67,6 +118,10 @@ export const idlFactory = ({ IDL }) => {
     'dataScientist' : IDL.Null,
   });
   const Time = IDL.Int;
+  const GpsCoordinates = IDL.Record({
+    'latitude' : IDL.Float64,
+    'longitude' : IDL.Float64,
+  });
   const JobApplication = IDL.Record({
     'id' : IDL.Nat,
     'status' : ApplicationStatus,
@@ -74,20 +129,61 @@ export const idlFactory = ({ IDL }) => {
     'fullName' : IDL.Text,
     'email' : IDL.Text,
     'timestamp' : Time,
+    'locationLabel' : IDL.Opt(IDL.Text),
     'coverNote' : IDL.Text,
+    'location' : IDL.Opt(GpsCoordinates),
     'resumeUrl' : IDL.Text,
+  });
+  const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const VisitorLog = IDL.Record({
+    'id' : IDL.Nat,
+    'latitude' : IDL.Float64,
+    'longitude' : IDL.Float64,
+    'timestamp' : Time,
+    'userAgent' : IDL.Text,
   });
   
   return IDL.Service({
+    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'blockEmail' : IDL.Func([IDL.Text], [], []),
     'getAllApplications' : IDL.Func([], [IDL.Vec(JobApplication)], ['query']),
+    'getBlockedEmails' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
+    'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getTotalApplications' : IDL.Func([], [IDL.Nat], ['query']),
+    'getUserProfile' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(UserProfile)],
+        ['query'],
+      ),
+    'getVisitorLogs' : IDL.Func([], [IDL.Vec(VisitorLog)], ['query']),
     'isAcceptingApplications' : IDL.Func([], [IDL.Bool], ['query']),
+    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'isEmailBlocked' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'logVisitorLocation' : IDL.Func(
+        [IDL.Float64, IDL.Float64, IDL.Text],
+        [],
+        [],
+      ),
+    'resetAdminClaim' : IDL.Func([], [], []),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setAcceptingApplications' : IDL.Func([IDL.Bool], [], []),
     'submitApplication' : IDL.Func(
-        [IDL.Text, IDL.Text, JobRole, IDL.Text, IDL.Text],
+        [
+          IDL.Text,
+          IDL.Text,
+          JobRole,
+          IDL.Text,
+          IDL.Text,
+          IDL.Opt(IDL.Float64),
+          IDL.Opt(IDL.Float64),
+          IDL.Opt(IDL.Text),
+        ],
         [IDL.Nat],
         [],
       ),
+    'unblockEmail' : IDL.Func([IDL.Text], [], []),
     'updateApplicationStatus' : IDL.Func([IDL.Nat, ApplicationStatus], [], []),
   });
 };

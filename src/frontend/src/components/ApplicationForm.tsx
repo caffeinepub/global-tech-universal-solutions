@@ -14,6 +14,8 @@ import {
   BanIcon,
   CheckCircle2,
   Loader2,
+  MapPin,
+  MapPinOff,
   Send,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -50,6 +52,13 @@ interface Props {
   selectedRole: string;
   onRoleChange: (role: string) => void;
 }
+
+type LocationState =
+  | { status: "idle" }
+  | { status: "requesting" }
+  | { status: "captured"; latitude: number; longitude: number; label: string }
+  | { status: "denied" }
+  | { status: "error"; message: string };
 
 function validate(form: FormState): FormErrors {
   const errors: FormErrors = {};
@@ -90,9 +99,12 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
     boolean | null
   >(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [locationState, setLocationState] = useState<LocationState>({
+    status: "idle",
+  });
+  const locationRequested = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
 
-  // Check if applications are open
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -102,7 +114,7 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
         if (!cancelled) setAcceptingApplications(accepting);
       } catch (err) {
         console.error(err);
-        if (!cancelled) setAcceptingApplications(true); // fallback: show form
+        if (!cancelled) setAcceptingApplications(true);
       } finally {
         if (!cancelled) setCheckingStatus(false);
       }
@@ -112,7 +124,19 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
     };
   }, []);
 
-  // Sync external role selection
+  // Auto-request location once the form is visible and accepting
+  useEffect(() => {
+    if (
+      !checkingStatus &&
+      acceptingApplications &&
+      !locationRequested.current
+    ) {
+      locationRequested.current = true;
+      requestLocation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkingStatus, acceptingApplications]);
+
   useEffect(() => {
     if (selectedRole) {
       setForm((prev) => ({ ...prev, role: selectedRole }));
@@ -123,6 +147,35 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
   const setField = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationState({
+        status: "error",
+        message: "Geolocation is not supported by your browser.",
+      });
+      return;
+    }
+    setLocationState({ status: "requesting" });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const label = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        setLocationState({ status: "captured", latitude, longitude, label });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationState({ status: "denied" });
+        } else {
+          setLocationState({
+            status: "error",
+            message: "Unable to retrieve your location.",
+          });
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,12 +190,26 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
     try {
       const role = form.role as JobRole;
       const actor = await createActorWithConfig();
+
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let locationLabel: string | null = null;
+
+      if (locationState.status === "captured") {
+        latitude = locationState.latitude;
+        longitude = locationState.longitude;
+        locationLabel = locationState.label;
+      }
+
       await actor.submitApplication(
         form.fullName.trim(),
         form.email.trim(),
         role,
         form.resumeUrl.trim(),
         form.coverNote.trim(),
+        latitude,
+        longitude,
+        locationLabel,
       );
       setSubmitted(true);
       toast.success("Your application has been submitted! We'll be in touch.");
@@ -153,6 +220,8 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
         resumeUrl: "",
         coverNote: "",
       });
+      locationRequested.current = false;
+      setLocationState({ status: "idle" });
     } catch (err) {
       console.error(err);
       toast.error("Something went wrong. Please try again.");
@@ -174,7 +243,6 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
       className="relative py-24 lg:py-32 overflow-hidden"
       style={{ background: "oklch(0.10 0.02 255)" }}
     >
-      {/* Ambient glow */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -185,7 +253,6 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
       <div className="section-divider absolute top-0 left-0 right-0" />
 
       <div className="relative max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="text-center mb-12">
           <div
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold tracking-widest uppercase mb-4"
@@ -208,7 +275,6 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
           </p>
         </div>
 
-        {/* Form card */}
         <div
           className="rounded-2xl p-8 md:p-10 relative overflow-hidden"
           style={{
@@ -217,7 +283,6 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
             boxShadow: "0 20px 60px oklch(0 0 0 / 0.4)",
           }}
         >
-          {/* Top line */}
           <div
             className="absolute top-0 left-0 right-0 h-px"
             style={{
@@ -227,7 +292,6 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
           />
 
           {checkingStatus ? (
-            /* Loading state */
             <div
               className="flex flex-col items-center justify-center text-center py-12 gap-4"
               data-ocid="application_form.loading_state"
@@ -242,7 +306,6 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
               </p>
             </div>
           ) : !acceptingApplications ? (
-            /* Applications closed notice */
             <div
               className="flex flex-col items-center text-center py-10 gap-5"
               data-ocid="application_form.error_state"
@@ -307,6 +370,115 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} noValidate className="space-y-6">
+              {/* Location Status Banner */}
+              {locationState.status === "requesting" && (
+                <div
+                  className="rounded-xl p-4 flex items-center gap-3"
+                  style={{
+                    background: "oklch(0.84 0.18 200 / 0.07)",
+                    border: "1px solid oklch(0.84 0.18 200 / 0.25)",
+                  }}
+                  data-ocid="application_form.loading_state"
+                >
+                  <Loader2
+                    size={18}
+                    className="animate-spin"
+                    style={{ color: "oklch(0.84 0.18 200)" }}
+                  />
+                  <p
+                    className="text-sm flex-1"
+                    style={{ color: "oklch(0.75 0.02 230)" }}
+                  >
+                    Detecting your location…
+                  </p>
+                </div>
+              )}
+
+              {locationState.status === "captured" && (
+                <div
+                  className="rounded-xl p-4 flex items-center gap-3"
+                  style={{
+                    background: "oklch(0.75 0.18 145 / 0.08)",
+                    border: "1px solid oklch(0.75 0.18 145 / 0.3)",
+                  }}
+                  data-ocid="application_form.success_state"
+                >
+                  <CheckCircle2
+                    size={18}
+                    style={{ color: "oklch(0.75 0.18 145)" }}
+                  />
+                  <div className="flex-1">
+                    <p
+                      className="text-sm font-semibold"
+                      style={{ color: "oklch(0.75 0.18 145)" }}
+                    >
+                      Location included
+                    </p>
+                    <p
+                      className="text-xs mt-0.5 font-mono"
+                      style={{ color: "oklch(0.60 0.025 230)" }}
+                    >
+                      {locationState.latitude.toFixed(6)}°,{" "}
+                      {locationState.longitude.toFixed(6)}°
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {locationState.status === "denied" && (
+                <div
+                  className="rounded-xl p-4 flex items-center gap-3"
+                  style={{
+                    background: "oklch(0.55 0.18 30 / 0.06)",
+                    border: "1px solid oklch(0.55 0.18 30 / 0.22)",
+                  }}
+                >
+                  <MapPinOff
+                    size={16}
+                    style={{ color: "oklch(0.65 0.14 30)" }}
+                  />
+                  <p
+                    className="text-sm flex-1"
+                    style={{ color: "oklch(0.65 0.14 30)" }}
+                  >
+                    Location access denied — your application will be submitted
+                    without location data
+                  </p>
+                </div>
+              )}
+
+              {locationState.status === "error" && (
+                <div
+                  className="rounded-xl p-4 flex items-center gap-3"
+                  style={{
+                    background: "oklch(0.55 0.18 30 / 0.08)",
+                    border: "1px solid oklch(0.55 0.18 30 / 0.3)",
+                  }}
+                  data-ocid="application_form.error_state"
+                >
+                  <AlertCircle
+                    size={16}
+                    style={{ color: "oklch(0.72 0.18 30)" }}
+                  />
+                  <p
+                    className="text-sm flex-1"
+                    style={{ color: "oklch(0.72 0.18 30)" }}
+                  >
+                    {locationState.message}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={requestLocation}
+                    className="text-xs h-7"
+                    style={{ color: "oklch(0.55 0.025 230)" }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+
               {/* Full Name */}
               <div className="space-y-2">
                 <Label
@@ -418,7 +590,7 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
                 )}
               </div>
 
-              {/* LinkedIn / Resume URL */}
+              {/* Resume URL */}
               <div className="space-y-2">
                 <Label
                   htmlFor="resumeUrl"
@@ -492,7 +664,16 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
                 )}
               </div>
 
-              {/* Submit */}
+              {/* Location note */}
+              <p
+                className="text-xs flex items-center gap-1.5"
+                style={{ color: "oklch(0.45 0.02 230)" }}
+              >
+                <MapPin size={11} />
+                Your location is automatically included to help assign
+                correspondence.
+              </p>
+
               <Button
                 type="submit"
                 disabled={isSubmitting}

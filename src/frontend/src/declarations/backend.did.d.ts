@@ -15,6 +15,7 @@ export type ApplicationStatus = { 'pending' : null } |
   { 'rejected' : null } |
   { 'reviewed' : null } |
   { 'offered' : null };
+export interface GpsCoordinates { 'latitude' : number, 'longitude' : number }
 export interface JobApplication {
   'id' : bigint,
   'status' : ApplicationStatus,
@@ -22,7 +23,9 @@ export interface JobApplication {
   'fullName' : string,
   'email' : string,
   'timestamp' : Time,
+  'locationLabel' : [] | [string],
   'coverNote' : string,
+  'location' : [] | [GpsCoordinates],
   'resumeUrl' : string,
 }
 export type JobRole = { 'fullStackDeveloper' : null } |
@@ -32,15 +35,49 @@ export type JobRole = { 'fullStackDeveloper' : null } |
   { 'networkEngineer' : null } |
   { 'dataScientist' : null };
 export type Time = bigint;
+export interface UserProfile { 'name' : string }
+export type UserRole = { 'admin' : null } |
+  { 'user' : null } |
+  { 'guest' : null };
+export interface VisitorLog {
+  'id' : bigint,
+  'latitude' : number,
+  'longitude' : number,
+  'timestamp' : Time,
+  'userAgent' : string,
+}
 export interface _SERVICE {
+  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'blockEmail' : ActorMethod<[string], undefined>,
   'getAllApplications' : ActorMethod<[], Array<JobApplication>>,
+  'getBlockedEmails' : ActorMethod<[], Array<string>>,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getTotalApplications' : ActorMethod<[], bigint>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getVisitorLogs' : ActorMethod<[], Array<VisitorLog>>,
   'isAcceptingApplications' : ActorMethod<[], boolean>,
+  'isCallerAdmin' : ActorMethod<[], boolean>,
+  'isEmailBlocked' : ActorMethod<[string], boolean>,
+  'logVisitorLocation' : ActorMethod<[number, number, string], undefined>,
+  'resetAdminClaim' : ActorMethod<[], undefined>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setAcceptingApplications' : ActorMethod<[boolean], undefined>,
   'submitApplication' : ActorMethod<
-    [string, string, JobRole, string, string],
+    [
+      string,
+      string,
+      JobRole,
+      string,
+      string,
+      [] | [number],
+      [] | [number],
+      [] | [string],
+    ],
     bigint
   >,
+  'unblockEmail' : ActorMethod<[string], undefined>,
   'updateApplicationStatus' : ActorMethod<
     [bigint, ApplicationStatus],
     undefined
