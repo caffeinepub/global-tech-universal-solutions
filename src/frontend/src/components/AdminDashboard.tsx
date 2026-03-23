@@ -1077,13 +1077,13 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                     className="text-sm"
                     style={{ color: "oklch(0.55 0.025 230)" }}
                   >
-                    No visitor location data yet.
+                    No visitor entries yet.
                   </p>
                   <p
                     className="text-xs"
                     style={{ color: "oklch(0.42 0.022 255)" }}
                   >
-                    Visitors who allow location access will appear here.
+                    Visitors will appear here regardless of location permission.
                   </p>
                 </div>
               ) : (
@@ -1134,9 +1134,19 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                           minute: "2-digit",
                           second: "2-digit",
                         });
-                        const lat = log.latitude.toFixed(6);
-                        const lng = log.longitude.toFixed(6);
-                        const mapsUrl = `https://maps.google.com/?q=${log.latitude},${log.longitude}`;
+                        const hasLocation =
+                          log.locationAccess &&
+                          log.latitude !== undefined &&
+                          log.longitude !== undefined;
+                        const lat = hasLocation
+                          ? log.latitude!.toFixed(6)
+                          : null;
+                        const lng = hasLocation
+                          ? log.longitude!.toFixed(6)
+                          : null;
+                        const mapsUrl = hasLocation
+                          ? `https://maps.google.com/?q=${log.latitude},${log.longitude}`
+                          : null;
                         return (
                           <TableRow
                             key={String(log.id)}
@@ -1159,26 +1169,51 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                               className="text-sm font-mono"
                               style={{ color: "oklch(0.78 0.018 255)" }}
                             >
-                              {lat}, {lng}
+                              {hasLocation ? (
+                                <span>
+                                  {lat}, {lng}
+                                </span>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center gap-1.5 text-xs font-sans px-2 py-0.5 rounded-full"
+                                  style={{
+                                    background: "oklch(0.20 0.035 25)",
+                                    color: "oklch(0.70 0.12 25)",
+                                  }}
+                                  data-ocid={"admin.visitors.location_denied"}
+                                >
+                                  <MapPin className="h-3 w-3" />
+                                  Location Denied
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>
-                              <a
-                                href={mapsUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                data-ocid={`admin.visitors.link.${idx + 1}`}
-                              >
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1.5 text-xs"
-                                  style={{ color: "oklch(0.62 0.18 255)" }}
+                              {hasLocation && mapsUrl ? (
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  data-ocid={`admin.visitors.link.${idx + 1}`}
                                 >
-                                  <MapPin className="h-3.5 w-3.5" />
-                                  View on Google Maps
-                                  <ExternalLink className="h-3 w-3 opacity-60" />
-                                </Button>
-                              </a>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1.5 text-xs"
+                                    style={{ color: "oklch(0.62 0.18 255)" }}
+                                  >
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    View on Google Maps
+                                    <ExternalLink className="h-3 w-3 opacity-60" />
+                                  </Button>
+                                </a>
+                              ) : (
+                                <span
+                                  className="text-xs"
+                                  style={{ color: "oklch(0.40 0.020 255)" }}
+                                >
+                                  —
+                                </span>
+                              )}
                             </TableCell>
                           </TableRow>
                         );

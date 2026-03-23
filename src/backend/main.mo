@@ -41,8 +41,9 @@ actor {
   type VisitorLog = {
     id : Nat;
     timestamp : Time.Time;
-    latitude : Float;
-    longitude : Float;
+    locationAccess : Bool;
+    latitude : ?Float;
+    longitude : ?Float;
     userAgent : Text;
   };
 
@@ -201,8 +202,23 @@ actor {
     let visitorLog : VisitorLog = {
       id = logId;
       timestamp = Time.now();
-      latitude;
-      longitude;
+      locationAccess = true;
+      latitude = ?latitude;
+      longitude = ?longitude;
+      userAgent;
+    };
+    visitorLogs.add(logId, visitorLog);
+  };
+
+  public shared ({ caller }) func logVisitorNoLocation(userAgent : Text) : async () {
+    let logId = nextVisitorLogId;
+    nextVisitorLogId += 1;
+    let visitorLog : VisitorLog = {
+      id = logId;
+      timestamp = Time.now();
+      locationAccess = false;
+      latitude = null;
+      longitude = null;
       userAgent;
     };
     visitorLogs.add(logId, visitorLog);

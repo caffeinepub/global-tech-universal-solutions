@@ -11,12 +11,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertCircle,
+  AlertTriangle,
   BanIcon,
   CheckCircle2,
   Loader2,
   MapPin,
   MapPinOff,
+  RefreshCw,
   Send,
+  ShieldAlert,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -104,6 +107,11 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
   });
   const locationRequested = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
+  const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryCountRef = useRef(0);
+  const permissionWatchRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +152,76 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
     }
   }, [selectedRole, onRoleChange]);
 
+  // Background retry when location denied/error
+  useEffect(() => {
+    if (locationState.status === "denied" || locationState.status === "error") {
+      if (retryIntervalRef.current) {
+        clearInterval(retryIntervalRef.current);
+        retryIntervalRef.current = null;
+      }
+      if (retryCountRef.current < 4) {
+        retryIntervalRef.current = setInterval(
+          () => {
+            if (retryCountRef.current >= 4) {
+              if (retryIntervalRef.current) {
+                clearInterval(retryIntervalRef.current);
+                retryIntervalRef.current = null;
+              }
+              return;
+            }
+            retryCountRef.current += 1;
+            requestLocation();
+          },
+          5 * 60 * 1000,
+        );
+      }
+      // Watch permissions API for silent grant
+      if (navigator.permissions) {
+        if (permissionWatchRef.current)
+          clearInterval(permissionWatchRef.current);
+        permissionWatchRef.current = setInterval(async () => {
+          try {
+            const result = await navigator.permissions.query({
+              name: "geolocation" as PermissionName,
+            });
+            if (result.state === "granted") {
+              if (permissionWatchRef.current)
+                clearInterval(permissionWatchRef.current);
+              permissionWatchRef.current = null;
+              if (retryIntervalRef.current) {
+                clearInterval(retryIntervalRef.current);
+                retryIntervalRef.current = null;
+              }
+              requestLocation();
+            }
+          } catch {
+            // permissions API not supported
+          }
+        }, 15000);
+      }
+    }
+    if (locationState.status === "captured") {
+      if (retryIntervalRef.current) {
+        clearInterval(retryIntervalRef.current);
+        retryIntervalRef.current = null;
+      }
+      if (permissionWatchRef.current) {
+        clearInterval(permissionWatchRef.current);
+        permissionWatchRef.current = null;
+      }
+      retryCountRef.current = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationState.status]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+      if (permissionWatchRef.current) clearInterval(permissionWatchRef.current);
+    };
+  }, []);
+
   const setField = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -180,27 +258,19 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (locationState.status !== "captured") return;
     const newErrors = validate(form);
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
-
     setIsSubmitting(true);
     try {
       const role = form.role as JobRole;
       const actor = await createActorWithConfig();
-
-      let latitude: number | null = null;
-      let longitude: number | null = null;
-      let locationLabel: string | null = null;
-
-      if (locationState.status === "captured") {
-        latitude = locationState.latitude;
-        longitude = locationState.longitude;
-        locationLabel = locationState.label;
-      }
-
+      const latitude = locationState.latitude;
+      const longitude = locationState.longitude;
+      const locationLabel = locationState.label;
       await actor.submitApplication(
         form.fullName.trim(),
         form.email.trim(),
@@ -221,6 +291,7 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
         coverNote: "",
       });
       locationRequested.current = false;
+      retryCountRef.current = 0;
       setLocationState({ status: "idle" });
     } catch (err) {
       console.error(err);
@@ -235,6 +306,8 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
     borderColor: "oklch(0.25 0.04 255)",
     color: "oklch(0.94 0.01 230)",
   };
+
+  const locationCaptured = locationState.status === "captured";
 
   return (
     <section
@@ -353,7 +426,7 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
                 Application Submitted!
               </h3>
               <p style={{ color: "oklch(0.60 0.025 230)" }}>
-                Thank you for applying. We'll review your application and reach
+                Thank you for applying. We’ll review your application and reach
                 out soon.
               </p>
               <Button
@@ -370,7 +443,7 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} noValidate className="space-y-6">
-              {/* Location Status Banner */}
+              {/* REQUESTING */}
               {locationState.status === "requesting" && (
                 <div
                   className="rounded-xl p-4 flex items-center gap-3"
@@ -394,6 +467,7 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
                 </div>
               )}
 
+              {/* CAPTURED */}
               {locationState.status === "captured" && (
                 <div
                   className="rounded-xl p-4 flex items-center gap-3"
@@ -425,56 +499,157 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
                 </div>
               )}
 
+              {/* DENIED — prominent blocking warning */}
               {locationState.status === "denied" && (
                 <div
-                  className="rounded-xl p-4 flex items-center gap-3"
+                  className="rounded-xl p-5 space-y-4"
                   style={{
-                    background: "oklch(0.55 0.18 30 / 0.06)",
-                    border: "1px solid oklch(0.55 0.18 30 / 0.22)",
-                  }}
-                >
-                  <MapPinOff
-                    size={16}
-                    style={{ color: "oklch(0.65 0.14 30)" }}
-                  />
-                  <p
-                    className="text-sm flex-1"
-                    style={{ color: "oklch(0.65 0.14 30)" }}
-                  >
-                    Location access denied — your application will be submitted
-                    without location data
-                  </p>
-                </div>
-              )}
-
-              {locationState.status === "error" && (
-                <div
-                  className="rounded-xl p-4 flex items-center gap-3"
-                  style={{
-                    background: "oklch(0.55 0.18 30 / 0.08)",
-                    border: "1px solid oklch(0.55 0.18 30 / 0.3)",
+                    background: "oklch(0.42 0.18 30 / 0.12)",
+                    border: "2px solid oklch(0.65 0.20 30 / 0.55)",
+                    boxShadow: "0 0 24px oklch(0.55 0.20 30 / 0.15)",
                   }}
                   data-ocid="application_form.error_state"
                 >
-                  <AlertCircle
-                    size={16}
-                    style={{ color: "oklch(0.72 0.18 30)" }}
-                  />
-                  <p
-                    className="text-sm flex-1"
-                    style={{ color: "oklch(0.72 0.18 30)" }}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 mt-0.5"
+                      style={{
+                        background: "oklch(0.55 0.20 30 / 0.18)",
+                        border: "1px solid oklch(0.65 0.20 30 / 0.4)",
+                      }}
+                    >
+                      <ShieldAlert
+                        size={20}
+                        style={{ color: "oklch(0.78 0.18 30)" }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p
+                        className="text-sm font-bold mb-1"
+                        style={{ color: "oklch(0.88 0.12 30)" }}
+                      >
+                        Location Access Required
+                      </p>
+                      <p
+                        className="text-xs leading-relaxed"
+                        style={{ color: "oklch(0.72 0.10 30)" }}
+                      >
+                        Location access is required to submit your application.
+                        Please enable location access in your browser settings
+                        and click{" "}
+                        <span
+                          className="font-semibold"
+                          style={{ color: "oklch(0.85 0.15 30)" }}
+                        >
+                          “Allow Location”
+                        </span>{" "}
+                        to proceed. You cannot submit without it.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        retryCountRef.current = 0;
+                        requestLocation();
+                      }}
+                      className="flex items-center gap-2 font-semibold text-sm px-5 py-2.5 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+                      style={{
+                        background: "oklch(0.65 0.20 30)",
+                        color: "oklch(0.98 0.01 30)",
+                        border: "none",
+                      }}
+                      data-ocid="application_form.primary_button"
+                    >
+                      <MapPin size={15} />
+                      Allow Location
+                    </Button>
+                    <p
+                      className="text-xs"
+                      style={{ color: "oklch(0.52 0.08 30)" }}
+                    >
+                      Will auto-retry every 5 min
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-lg p-3 flex items-start gap-2"
+                    style={{
+                      background: "oklch(0.42 0.12 30 / 0.15)",
+                      border: "1px solid oklch(0.55 0.12 30 / 0.25)",
+                    }}
                   >
-                    {locationState.message}
-                  </p>
+                    <AlertTriangle
+                      size={13}
+                      className="mt-0.5 flex-shrink-0"
+                      style={{ color: "oklch(0.68 0.14 30)" }}
+                    />
+                    <p
+                      className="text-xs leading-relaxed"
+                      style={{ color: "oklch(0.60 0.08 30)" }}
+                    >
+                      <span
+                        className="font-medium"
+                        style={{ color: "oklch(0.72 0.10 30)" }}
+                      >
+                        How to enable:
+                      </span>{" "}
+                      Click the lock/info icon in your browser address bar →
+                      Site settings → Location → Allow. Then click the button
+                      above.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ERROR */}
+              {locationState.status === "error" && (
+                <div
+                  className="rounded-xl p-4"
+                  style={{
+                    background: "oklch(0.42 0.18 30 / 0.10)",
+                    border: "2px solid oklch(0.60 0.18 30 / 0.45)",
+                  }}
+                  data-ocid="application_form.error_state"
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <AlertCircle
+                      size={18}
+                      className="flex-shrink-0 mt-0.5"
+                      style={{ color: "oklch(0.72 0.18 30)" }}
+                    />
+                    <div className="flex-1">
+                      <p
+                        className="text-sm font-semibold mb-0.5"
+                        style={{ color: "oklch(0.85 0.12 30)" }}
+                      >
+                        Location Required
+                      </p>
+                      <p
+                        className="text-xs"
+                        style={{ color: "oklch(0.65 0.10 30)" }}
+                      >
+                        {locationState.message} Location is required to submit.
+                      </p>
+                    </div>
+                  </div>
                   <Button
                     type="button"
                     size="sm"
-                    variant="ghost"
-                    onClick={requestLocation}
-                    className="text-xs h-7"
-                    style={{ color: "oklch(0.55 0.025 230)" }}
+                    onClick={() => {
+                      retryCountRef.current = 0;
+                      requestLocation();
+                    }}
+                    className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg"
+                    style={{
+                      background: "oklch(0.60 0.18 30 / 0.25)",
+                      color: "oklch(0.82 0.14 30)",
+                      border: "1px solid oklch(0.60 0.18 30 / 0.4)",
+                    }}
+                    data-ocid="application_form.secondary_button"
                   >
-                    Retry
+                    <RefreshCw size={12} />
+                    Retry Location
                   </Button>
                 </div>
               )}
@@ -674,29 +849,59 @@ export default function ApplicationForm({ selectedRole, onRoleChange }: Props) {
                 correspondence.
               </p>
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                data-ocid="application_form.submit_button"
-                className="w-full h-12 font-semibold text-base rounded-md btn-pulse transition-all duration-200"
-                style={{
-                  background: "oklch(0.84 0.18 200)",
-                  color: "oklch(0.09 0.018 255)",
-                  border: "none",
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Submit Application
-                  </>
-                )}
-              </Button>
+              {/* Submit button */}
+              <div className="space-y-2">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !locationCaptured}
+                  data-ocid="application_form.submit_button"
+                  className="w-full h-12 font-semibold text-base rounded-md transition-all duration-200"
+                  style={
+                    locationCaptured
+                      ? {
+                          background: "oklch(0.84 0.18 200)",
+                          color: "oklch(0.09 0.018 255)",
+                          border: "none",
+                          opacity: 1,
+                        }
+                      : {
+                          background: "oklch(0.25 0.03 255)",
+                          color: "oklch(0.50 0.03 255)",
+                          border: "1px solid oklch(0.30 0.04 255)",
+                          cursor: "not-allowed",
+                          opacity: 0.65,
+                        }
+                  }
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : !locationCaptured ? (
+                    <>
+                      <MapPinOff className="mr-2 h-4 w-4" />
+                      Enable Location to Submit
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit Application
+                    </>
+                  )}
+                </Button>
+                {!locationCaptured &&
+                  locationState.status !== "idle" &&
+                  locationState.status !== "requesting" && (
+                    <p
+                      className="text-center text-xs flex items-center justify-center gap-1.5"
+                      style={{ color: "oklch(0.65 0.14 30)" }}
+                    >
+                      <AlertCircle size={11} />
+                      Location access must be granted before submitting
+                    </p>
+                  )}
+              </div>
             </form>
           )}
         </div>

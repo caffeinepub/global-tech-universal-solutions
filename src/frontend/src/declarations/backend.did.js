@@ -48,8 +48,9 @@ export const JobApplication = IDL.Record({
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const VisitorLog = IDL.Record({
   'id' : IDL.Nat,
-  'latitude' : IDL.Float64,
-  'longitude' : IDL.Float64,
+  'latitude' : IDL.Opt(IDL.Float64),
+  'locationAccess' : IDL.Bool,
+  'longitude' : IDL.Opt(IDL.Float64),
   'timestamp' : Time,
   'userAgent' : IDL.Text,
 });
@@ -73,6 +74,7 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isEmailBlocked' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'logVisitorLocation' : IDL.Func([IDL.Float64, IDL.Float64, IDL.Text], [], []),
+  'logVisitorNoLocation' : IDL.Func([IDL.Text], [], []),
   'resetAdminClaim' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setAcceptingApplications' : IDL.Func([IDL.Bool], [], []),
@@ -137,8 +139,9 @@ export const idlFactory = ({ IDL }) => {
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const VisitorLog = IDL.Record({
     'id' : IDL.Nat,
-    'latitude' : IDL.Float64,
-    'longitude' : IDL.Float64,
+    'latitude' : IDL.Opt(IDL.Float64),
+    'locationAccess' : IDL.Bool,
+    'longitude' : IDL.Opt(IDL.Float64),
     'timestamp' : Time,
     'userAgent' : IDL.Text,
   });
@@ -166,6 +169,7 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'logVisitorNoLocation' : IDL.Func([IDL.Text], [], []),
     'resetAdminClaim' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setAcceptingApplications' : IDL.Func([IDL.Bool], [], []),

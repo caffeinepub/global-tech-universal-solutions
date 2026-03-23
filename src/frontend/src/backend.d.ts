@@ -14,8 +14,9 @@ export interface GpsCoordinates {
 }
 export interface VisitorLog {
     id: bigint;
-    latitude: number;
-    longitude: number;
+    latitude?: number;
+    locationAccess: boolean;
+    longitude?: number;
     timestamp: Time;
     userAgent: string;
 }
@@ -68,6 +69,7 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     isEmailBlocked(email: string): Promise<boolean>;
     logVisitorLocation(latitude: number, longitude: number, userAgent: string): Promise<void>;
+    logVisitorNoLocation(userAgent: string): Promise<void>;
     resetAdminClaim(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setAcceptingApplications(value: boolean): Promise<void>;

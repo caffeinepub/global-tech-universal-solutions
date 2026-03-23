@@ -41,8 +41,9 @@ export type UserRole = { 'admin' : null } |
   { 'guest' : null };
 export interface VisitorLog {
   'id' : bigint,
-  'latitude' : number,
-  'longitude' : number,
+  'latitude' : [] | [number],
+  'locationAccess' : boolean,
+  'longitude' : [] | [number],
   'timestamp' : Time,
   'userAgent' : string,
 }
@@ -61,6 +62,7 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isEmailBlocked' : ActorMethod<[string], boolean>,
   'logVisitorLocation' : ActorMethod<[number, number, string], undefined>,
+  'logVisitorNoLocation' : ActorMethod<[string], undefined>,
   'resetAdminClaim' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setAcceptingApplications' : ActorMethod<[boolean], undefined>,
